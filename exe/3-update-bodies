@@ -42,9 +42,10 @@ end
 
 def process_issue(issues_size, issue, idx)
   project_key = ENV.fetch("JIRA_PROJECT_KEY")
+  repo_name = ENV.fetch("GITHUB_REPO_NAME")
 
   number = issue["number"]
-  key = "#{project_key}-#{number}"
+  key = "#{project_key}-#{repo_name}-#{number}"
 
 
   if SKIP_PROCESSED && processed?(number) && !processing_failed?(number)

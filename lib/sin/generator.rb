@@ -20,6 +20,10 @@ class Sin::Generator
     ENV.fetch("AUTOMATION_FOR_JIRA_USER_ID")
   end
 
+  def github_repo_name
+    ENV.fetch("GITHUB_REPO_NAME")
+  end
+
   def assignee
     Sin::User.atlassian_id(self.issue.dig("assignee", "login"))
   end
@@ -58,7 +62,7 @@ class Sin::Generator
 
     {
       externalId: self.issue["number"],
-      key: "#{self.project_key}-#{self.issue['number']}",
+      key: "#{self.project_key}-#{self.github_repo_name}-#{self.issue['number']}",
       created: Time.parse(self.issue["created_at"]).utc.iso8601,
       updated: Time.parse(self.issue["updated_at"]).utc.iso8601,
       summary: self.issue["title"],
