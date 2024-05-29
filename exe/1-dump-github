@@ -29,7 +29,7 @@ puts "Fetching GitHub issues ..."
 # - `data/logs`
 #
 # Keep `data/github-to-atlassian.csv` around to be able to map users.
-issues = Sin::Github.instance.issues(state: :open).reject { |x| x.key?(:pull_request) }
+issues = Sin::Github.instance.issues(state: :all).reject { |x| x.key?(:pull_request) }
 puts "- fetched #{issues.size} GitHub issues"
 
 unless File.directory?("data/issues")
