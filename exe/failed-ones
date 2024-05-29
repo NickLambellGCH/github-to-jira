@@ -3,7 +3,10 @@
 
 require "sin"
 
-Dir.glob("data/logs/*.json").each do |file|
+repo_name = ENV.fetch("GITHUB_REPO_NAME")
+data_dir = "data/#{repo_name}"
+
+Dir.glob("#{data_dir}/logs/*.json").each do |file|
   j = JSON.parse(File.read(file))
 
   errors = []

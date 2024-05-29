@@ -29,24 +29,27 @@ puts "Fetching GitHub issues ..."
 # - `data/logs`
 #
 # Keep `data/github-to-atlassian.csv` around to be able to map users.
+repo_name = ENV.fetch("GITHUB_REPO_NAME")
+data_dir = "data/#{repo_name}"
+
 issues = Sin::Github.instance.issues(state: :all).reject { |x| x.key?(:pull_request) }
 puts "- fetched #{issues.size} GitHub issues"
 
-unless File.directory?("data/issues")
-  FileUtils.mkdir_p("data/issues")
+unless File.directory?("#{data_dir}/issues")
+  FileUtils.mkdir_p("#{data_dir}/issues")
 end
 
-puts "- saving issues to data/issues"
+puts "- saving issues to #{data_dir}/issues"
 issues.each do |issue|
   data = JSON.pretty_generate(issue.to_h)
-  file = format("data/issues/%d.json", issue[:number])
+  file = format("#{data_dir}/issues/%d.json", issue[:number])
   File.write(file, data)
 end
 
 # Reread from the cache, to be sure we operate on the same data, we
 # don't need to bother about :number vs "number", etc. Yeah, there are
 # other ways, but it is a quick hack, nothing re-usable.
-issues = Dir.glob("data/issues/*.json").map do |file|
+issues = Dir.glob("#{data_dir}/issues/*.json").map do |file|
   JSON.parse(File.read(file))
 end
 
@@ -54,8 +57,8 @@ puts "- (re)read #{issues.size} GitHub issues from the cache"
 
 puts "- fetching comments"
 
-unless File.directory?("data/comments")
-  FileUtils.mkdir_p("data/comments")
+unless File.directory?("#{data_dir}/comments")
+  FileUtils.mkdir_p("#{data_dir}/comments")
 end
 
 issues.each.with_index do |issue, idx|
@@ -72,5 +75,5 @@ issues.each.with_index do |issue, idx|
   end
 
   comments = comments.map(&:to_h)
-  File.write(format("data/comments/%d.json", number), JSON.pretty_generate(comments))
+  File.write(format("#{data_dir}/comments/%d.json", number), JSON.pretty_generate(comments))
 end

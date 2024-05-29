@@ -15,15 +15,21 @@ PARALLELIZE = false
 # will be processed.
 SKIP_PROCESSED = true
 
+def data_dir
+  repo_name = ENV.fetch("GITHUB_REPO_NAME")
+
+  "data/#{repo_name}"
+end
+
 # true if the issue was processed (= log file exists)
 def processed?(number)
-  File.exist?(format("data/logs/%d.json", number))
+  File.exist?(format("#{self.data_dir}/logs/%d.json", number))
 end
 
 # true if the processing failed (either main body or body of any
 # comment)
 def processing_failed?(number)
-  j = JSON.parse(File.read(format("data/logs/%d.json", number)))
+  j = JSON.parse(File.read(format("#{self.data_dir}/logs/%d.json", number)))
 
   return true if j.dig("issue", "status", "body", "status") != "ok"
 
@@ -108,7 +114,7 @@ def process_issue(issues_size, issue, idx)
     # Try to update comments only if the JIRA issue exists
 
     # Hash[comment_id] = comment
-    comments = JSON.parse(File.read(format("data/comments/%d.json", number)))
+    comments = JSON.parse(File.read(format("#{self.data_dir}/comments/%d.json", number)))
                  .map { |x| [x["id"], x] }
                  .to_h
 
@@ -205,18 +211,18 @@ def process_issue(issues_size, issue, idx)
     }
   }
 
-  File.write(format("data/logs/%d.json", number), JSON.pretty_generate(log))
+  File.write(format("#{self.data_dir}/logs/%d.json", number), JSON.pretty_generate(log))
 end
 
 
 puts "Reading issues..."
-issues = Dir.glob("data/issues/*.json").map do |file|
+issues = Dir.glob("#{self.data_dir}/issues/*.json").map do |file|
   JSON.parse(File.read(file))
 end
 puts "- read #{issues.size} issues"
 
-unless File.directory?("data/logs")
-  FileUtils.mkdir_p("data/logs")
+unless File.directory?("#{self.data_dir}/logs")
+  FileUtils.mkdir_p("#{self.data_dir}/logs")
 end
 
 issues_size = issues.size
