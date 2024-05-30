@@ -46,15 +46,18 @@ def processing_failed?(number)
   end
 end
 
-def process_issue(issues_size, issue, idx)
-  project_key = ENV.fetch("JIRA_PROJECT_KEY")
+def process_issue(issues_size, issue, idx, issue_map)
   repo_name = ENV.fetch("GITHUB_REPO_NAME")
 
   number = issue["number"]
-  key = "#{project_key}-#{repo_name}-#{number}"
+  external_id = "#{repo_name}-#{number}"
+  key = issue_map[external_id]
 
+  puts "- Mapped issue #{external_id} to #{key}"
 
   if SKIP_PROCESSED && processed?(number) && !processing_failed?(number)
+    puts "- Skipped processed issue #{key}"
+
     return
   end
 
@@ -221,6 +224,11 @@ issues = Dir.glob("#{self.data_dir}/issues/*.json").map do |file|
 end
 puts "- read #{issues.size} issues"
 
+puts "Reading issue map..."
+issue_map_path = "#{data_dir}/issues-map.json"
+issue_map = JSON.parse(File.read(issue_map_path))
+puts "- Read #{issue_map.size} issue mappings"
+
 unless File.directory?("#{self.data_dir}/logs")
   FileUtils.mkdir_p("#{self.data_dir}/logs")
 end
@@ -231,10 +239,10 @@ if PARALLELIZE
   # Keep the number relatively low otherwise you'll get too many
   # requests
   Parallel.each_with_index(issues, in_processes: 2) do |issue, idx|
-    process_issue(issues_size, issue, idx)
+    process_issue(issues_size, issue, idx, issue_map)
   end
 else
   issues.each_with_index do |issue, idx|
-    process_issue(issues_size, issue, idx)
+    process_issue(issues_size, issue, idx, issue_map)
   end
 end

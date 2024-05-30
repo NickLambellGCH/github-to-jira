@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+##
+# Generate JSON for to map JIRA issue 'External issue ID' field to Key.
+#
+# The generated map is then used in step 4 to find issues to update based on their external issue ID.
+
+require "sin"
+
+jira = Sin::Jira.instance
+jira.client.Field.map_fields
+
+puts "Fetching Jira issues for #{jira.project_key} ..."
+
+repo_name = ENV.fetch("GITHUB_REPO_NAME")
+data_dir = "data/#{repo_name}"
+
+issues = jira.project.issues
+puts "- Fetched #{issues.size} issues"
+
+issue_map = {}
+issues.each do |issue|
+  external_id = issue.External_issue_ID
+  unless external_id.nil?
+    issue_map[external_id] = issue.key
+  end
+end
+
+puts "- Mapped #{issue_map.size} issues"
+
+issue_map_path = "#{data_dir}/issues-map.json"
+issue_map_content = JSON.pretty_generate(issue_map)
+File.write(issue_map_path, issue_map_content)
+
+puts "- Saved issue map to #{issue_map_path}"

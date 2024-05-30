@@ -61,8 +61,7 @@ class Sin::Generator
     end
 
     {
-      externalId: self.issue["number"],
-      key: "#{self.project_key}-#{self.github_repo_name}-#{self.issue['number']}",
+      externalId: "#{self.github_repo_name}-#{self.issue["number"]}",
       created: Time.parse(self.issue["created_at"]).utc.iso8601,
       updated: Time.parse(self.issue["updated_at"]).utc.iso8601,
       summary: self.issue["title"],
