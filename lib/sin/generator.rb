@@ -72,6 +72,9 @@ class Sin::Generator
       status: self.status,
       resolution: self.resolution,
       labels: self.labels,
+      components: [
+        self.github_repo_name
+      ],
       customFieldValues: [
         {
           fieldName: "GitHub URL",
