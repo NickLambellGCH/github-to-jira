@@ -33,7 +33,7 @@ class Sin::Jira
   end
 
   def project_key
-    ENV.fetch("JIRA_PROJECT", "ARCHIVE")
+    ENV.fetch("JIRA_PROJECT_KEY", "ARCHIVE")
   end
 
   def client
