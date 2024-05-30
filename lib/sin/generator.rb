@@ -38,7 +38,7 @@ class Sin::Generator
 
   def resolution
     unless self.issue["state"] == "open"
-      "Resolved"
+      self.issue["state_reason"] == "not_planned" ? "Won't Do" : "Done"
     end
   end
 
