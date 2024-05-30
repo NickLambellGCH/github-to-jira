@@ -33,7 +33,7 @@ class Sin::Generator
   end
 
   def status
-    (self.issue["state"] == "open") ? "Open" : "Closed"
+    (self.issue["state"] == "open") ? "Imported" : "Complete"
   end
 
   def resolution
