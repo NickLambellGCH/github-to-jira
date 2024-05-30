@@ -68,7 +68,7 @@ class Sin::Generator
       summary: self.issue["title"],
       reporter: self.reporter,
       assignee: self.assignee,
-      issueType: "GitHub Issue",
+      issueType: "Task",
       status: self.status,
       resolution: self.resolution,
       labels: self.labels,
