@@ -225,7 +225,7 @@ end
 puts "- read #{issues.size} issues"
 
 puts "Reading issue map..."
-issue_map_path = "#{data_dir}/issues-map.json"
+issue_map_path = "data/issues-map.json"
 issue_map = JSON.parse(File.read(issue_map_path))
 puts "- Read #{issue_map.size} issue mappings"
 
