@@ -7,28 +7,28 @@ require "octokit"
 class Sin::Github
   include Singleton
 
-  def issue(number)
-    self.client.issue(self.repository, number)
+  def issue(repo, number)
+    self.client.issue(repo, number)
   end
 
-  def issues(state: :open)
-    self.client.list_issues(self.repository, state: state.to_s)
+  def issues(repo, state: :open)
+    self.client.list_issues(repo, state: state.to_s)
   end
 
-  def comments(number)
-    self.client.issue_comments(self.repository, number)
-  end
-
-  def repository
-    ENV.fetch("GITHUB_REPO")
+  def comments(repo, number)
+    self.client.issue_comments(repo, number)
   end
 
   def organization
-    self.repository.split("/").first
+    ENV.fetch("GITHUB_ORG")
   end
 
   def organization_members
     self.client.organization_members(self.organization)
+  end
+
+  def organization_repositories
+    self.client.organization_repositories(self.organization)
   end
 
   def rate_limit

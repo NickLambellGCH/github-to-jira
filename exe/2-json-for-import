@@ -11,25 +11,59 @@
 
 require "sin"
 
-repo_name = ENV.fetch("GITHUB_REPO_NAME")
-data_dir = "data/#{repo_name}"
+def write_json(path, issues)
+  for_import = {
+    projects: [
+      {
+        key: ENV.fetch("JIRA_PROJECT_KEY"),
+        issues: issues
+      }
+    ]
+  }
 
-puts "Generating JSON for Jira..."
-issues = Dir.glob("#{data_dir}/issues/*.json").map do |file|
-  issue = JSON.parse(File.read(file))
-  comments = JSON.parse(File.read(format("#{data_dir}/comments/%d.json", issue["number"])))
-  Sin::Generator.new(ENV.fetch("JIRA_PROJECT_KEY"), issue, comments).to_jira
+  File.write(path, JSON.pretty_generate(for_import))
 end
 
-for_import = {
-  projects: [
-    {
-      key: ENV.fetch("JIRA_PROJECT_KEY"),
-      issues: issues
-    }
-  ]
-}
+def process_repo(repo_name)
+  data_dir = "data/#{repo_name}"
+  out_path = "#{data_dir}/jira-import-me.json"
 
-File.write("#{data_dir}/jira-import-me.json", JSON.pretty_generate(for_import))
-puts "- done, written to #{data_dir}/jira-import-me.json"
-puts "- import at https://#{ENV.fetch("JIRA_HOST")}/secure/admin/JsonSetupPage!default.jspa?externalSystem=com.atlassian.jira.plugins.jim-plugin%3AjsonImporter"
+  puts
+  puts "Processing #{repo_name} ..."
+
+  issues = Dir.glob("#{data_dir}/issues/*.json").map do |file|
+    issue = JSON.parse(File.read(file))
+    comments = JSON.parse(File.read(format("#{data_dir}/comments/%d.json", issue["number"])))
+    Sin::Generator.new(ENV.fetch("JIRA_PROJECT_KEY"), issue, comments).to_jira(repo_name)
+  end
+
+  puts "- Found #{issues.count} issues"
+
+  write_json(out_path, issues)
+
+  puts "- Wrote repo specific file to #{out_path}"
+
+  issues
+end
+
+puts "Generating JSON for Jira ..."
+
+repo_dirs = Dir.glob("data/*/")
+repo_names = repo_dirs.map { |dir| dir.split("/").last }
+
+puts "Found #{repo_names.count} repo directories"
+
+all_issues = []
+repo_names.each do |repo_name|
+  repo_issues = process_repo(repo_name)
+  all_issues += repo_issues
+end
+
+puts
+puts "Found #{all_issues.count} issues in all repositories"
+
+out_path = "data/jira-import-me.json"
+write_json(out_path, all_issues)
+
+puts "Wrote all issues file to #{out_path}"
+puts "Import at https://#{ENV.fetch("JIRA_HOST")}/secure/admin/JsonSetupPage!default.jspa?externalSystem=com.atlassian.jira.plugins.jim-plugin%3AjsonImporter"

@@ -20,10 +20,6 @@ class Sin::Generator
     ENV.fetch("AUTOMATION_FOR_JIRA_USER_ID")
   end
 
-  def github_repo_name
-    ENV.fetch("GITHUB_REPO_NAME")
-  end
-
   def assignee
     Sin::User.atlassian_id(self.issue.dig("assignee", "login"))
   end
@@ -49,7 +45,7 @@ class Sin::Generator
       .presence
   end
 
-  def to_jira
+  def to_jira(repo_name)
     comments_value = self.comments.map do |comment|
       id = comment["id"]
       {
@@ -61,7 +57,7 @@ class Sin::Generator
     end
 
     {
-      externalId: "#{self.github_repo_name}-#{self.issue["number"]}",
+      externalId: "#{repo_name}-#{self.issue["number"]}",
       created: Time.parse(self.issue["created_at"]).utc.iso8601,
       updated: Time.parse(self.issue["updated_at"]).utc.iso8601,
       summary: self.issue["title"],
@@ -72,7 +68,7 @@ class Sin::Generator
       resolution: self.resolution,
       labels: self.labels,
       components: [
-        self.github_repo_name
+        repo_name
       ],
       customFieldValues: [
         {

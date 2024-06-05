@@ -15,21 +15,19 @@ PARALLELIZE = false
 # will be processed.
 SKIP_PROCESSED = true
 
-def data_dir
-  repo_name = ENV.fetch("GITHUB_REPO_NAME")
-
+def data_dir(repo_name)
   "data/#{repo_name}"
 end
 
 # true if the issue was processed (= log file exists)
-def processed?(number)
-  File.exist?(format("#{self.data_dir}/logs/%d.json", number))
+def processed?(repo_name, number)
+  File.exist?(format("#{self.data_dir(repo_name)}/logs/%d.json", number))
 end
 
 # true if the processing failed (either main body or body of any
 # comment)
-def processing_failed?(number)
-  j = JSON.parse(File.read(format("#{self.data_dir}/logs/%d.json", number)))
+def processing_failed?(repo_name, number)
+  j = JSON.parse(File.read(format("#{self.data_dir(repo_name)}/logs/%d.json", number)))
 
   return true if j.dig("issue", "status", "body", "status") != "ok"
 
@@ -46,29 +44,35 @@ def processing_failed?(number)
   end
 end
 
-def process_issue(issues_size, issue, idx, issue_map)
-  repo_name = ENV.fetch("GITHUB_REPO_NAME")
+def process_issue(issues_size, issue, idx, repo_name, issue_map)
+  data_dir = self.data_dir(repo_name)
 
   number = issue["number"]
   external_id = "#{repo_name}-#{number}"
   key = issue_map[external_id]
 
+  if key.nil?
+    puts "- Skipped processing issue #{external_id}. Unable to map key"
+
+    return
+  end
+
   puts "- Mapped issue #{external_id} to #{key}"
 
-  if SKIP_PROCESSED && processed?(number) && !processing_failed?(number)
+  if SKIP_PROCESSED && processed?(repo_name, number) && !processing_failed?(repo_name, number)
     puts "- Skipped processed issue #{key}"
 
     return
   end
 
-  puts "(#{idx + 1} / #{issues_size}) Updating issue #{number}..."
+  puts "- (#{idx + 1} / #{issues_size}) Updating issue #{number}..."
 
   ##
   # Body
 
   gh_body = issue["body"]
   body_status = if gh_body.blank?
-                  puts "- skipping body, blank"
+                  puts "  - skipping body, blank"
                   {
                     status: :ok,
                     description: "Blank GitHub issue body",
@@ -77,7 +81,7 @@ def process_issue(issues_size, issue, idx, issue_map)
                   doc = Sin::Body.new(issue["body"]).to_jira
 
                   if doc.blank?
-                    puts "- failed, unable to create ADF from the GitHub issue body"
+                    puts "  - failed, unable to create ADF from the GitHub issue body"
                     {
                       status: :failed,
                       description: "GitHub issue body exists, but ADF is blank"
@@ -94,13 +98,13 @@ def process_issue(issues_size, issue, idx, issue_map)
                         }
                       }
                       Sin::Jira.instance.update_issue(key, body)
-                      puts "- body updated"
+                      puts "  - body updated"
                       {
                         status: :ok,
                         description: "JIRA issue body updated"
                       }
                     rescue JIRA::HTTPError => e
-                      puts "- body update failed with #{e.code}"
+                      puts "  - body update failed with #{e.code}"
                       {
                         status: :failed,
                         description: "Failed to update JIRA issue body",
@@ -117,12 +121,12 @@ def process_issue(issues_size, issue, idx, issue_map)
     # Try to update comments only if the JIRA issue exists
 
     # Hash[comment_id] = comment
-    comments = JSON.parse(File.read(format("#{self.data_dir}/comments/%d.json", number)))
+    comments = JSON.parse(File.read(format("#{data_dir}/comments/%d.json", number)))
                  .map { |x| [x["id"], x] }
                  .to_h
 
     comment_statuses = if comments.blank?
-                         puts "- no comments, skipping"
+                         puts "  - no comments, skipping"
                          {
                            status: :ok,
                            description: "No GitHub issue comments, skipping"
@@ -157,13 +161,13 @@ def process_issue(issues_size, issue, idx, issue_map)
 
                              if gh_comment
                                if gh_comment["body"].blank?
-                                 puts "- GH comment blank, skipping"
+                                 puts "  - GH comment blank, skipping"
                                  base.merge({status: :ok, description: "Skipping, blank GitHub comment" })
                                else
                                  doc = Sin::Body.new(gh_comment["body"]).to_jira(ghcid: gh_comment_id)
 
                                  if doc.blank?
-                                   puts "- Can't convert comment body to ADF"
+                                   puts "  - Can't convert comment body to ADF"
                                    base.merge({status: :failed, description: "Can't convert body to ADF"})
                                  else
                                    begin
@@ -171,10 +175,10 @@ def process_issue(issues_size, issue, idx, issue_map)
                                        body: doc
                                      }
                                      j_comment.save!(body)
-                                     puts "- comment updated"
+                                     puts "  - comment updated"
                                      base.merge({status: :ok, description: "Comment updated"})
                                    rescue JIRA::HTTPError => e
-                                     puts "- failed to update comment #{e.code}: #{e.message}"
+                                     puts "  - failed to update comment #{e.code}: #{e.message}"
                                      base.merge({status: :failed,
                                                  description: "Failed to update JIRA comment",
                                                  error: { code: e.code, message: e.message }})
@@ -182,11 +186,11 @@ def process_issue(issues_size, issue, idx, issue_map)
                                  end
                                end
                              else
-                               puts "- failed, can't find GH comment #{gh_comment_id}"
+                               puts "  - failed, can't find GH comment #{gh_comment_id}"
                                base.merge({status: :failed, description: "Can't find GitHub comment"})
                              end
                            else
-                             puts "- failed, no GHCID in comment"
+                             puts "  - failed, no GHCID in comment"
                              {
                                status: :failed,
                                description: "Failed to detect the GitHub comment ID",
@@ -214,35 +218,49 @@ def process_issue(issues_size, issue, idx, issue_map)
     }
   }
 
-  File.write(format("#{self.data_dir}/logs/%d.json", number), JSON.pretty_generate(log))
+  File.write(format("#{data_dir}/logs/%d.json", number), JSON.pretty_generate(log))
 end
 
+def process_repo(repo_name, issue_map)
+  data_dir = self.data_dir(repo_name)
 
-puts "Reading issues..."
-issues = Dir.glob("#{self.data_dir}/issues/*.json").map do |file|
-  JSON.parse(File.read(file))
+  puts "Processing #{repo_name} ..."
+
+  issues = Dir.glob("#{data_dir}/issues/*.json").map do |file|
+    JSON.parse(File.read(file))
+  end
+  puts "- Found #{issues.size} issues"
+
+  unless File.directory?("#{data_dir}/logs")
+    FileUtils.mkdir_p("#{data_dir}/logs")
+  end
+
+  issues_size = issues.size
+
+  if PARALLELIZE
+    # Keep the number relatively low otherwise you'll get too many
+    # requests
+    Parallel.each_with_index(issues, in_processes: 2) do |issue, idx|
+      process_issue(issues_size, issue, idx, repo_name, issue_map)
+    end
+  else
+    issues.each_with_index do |issue, idx|
+      process_issue(issues_size, issue, idx, repo_name, issue_map)
+    end
+  end
 end
-puts "- read #{issues.size} issues"
 
-puts "Reading issue map..."
-issue_map_path = "data/issues-map.json"
-issue_map = JSON.parse(File.read(issue_map_path))
+puts "Updating Jira issue bodies"
+
+puts "Reading issue map ..."
+issue_map = JSON.parse(File.read("data/issues-map.json"))
 puts "- Read #{issue_map.size} issue mappings"
 
-unless File.directory?("#{self.data_dir}/logs")
-  FileUtils.mkdir_p("#{self.data_dir}/logs")
-end
+repo_dirs = Dir.glob("data/*/")
+repo_names = repo_dirs.map { |dir| dir.split("/").last }
 
-issues_size = issues.size
+puts "Found #{repo_names.size} repo directories"
 
-if PARALLELIZE
-  # Keep the number relatively low otherwise you'll get too many
-  # requests
-  Parallel.each_with_index(issues, in_processes: 2) do |issue, idx|
-    process_issue(issues_size, issue, idx, issue_map)
-  end
-else
-  issues.each_with_index do |issue, idx|
-    process_issue(issues_size, issue, idx, issue_map)
-  end
+repo_names.each do |repo_name|
+  process_repo(repo_name, issue_map)
 end

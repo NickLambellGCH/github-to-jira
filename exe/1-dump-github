@@ -12,8 +12,6 @@
 
 require "sin"
 
-puts "Fetching GitHub issues ..."
-
 # Allowed `state:` values are:
 #
 # - `:open` - just open GitHub issues
@@ -29,51 +27,69 @@ puts "Fetching GitHub issues ..."
 # - `data/logs`
 #
 # Keep `data/github-to-atlassian.csv` around to be able to map users.
-repo_name = ENV.fetch("GITHUB_REPO_NAME")
-data_dir = "data/#{repo_name}"
 
-issues = Sin::Github.instance.issues(state: :all).reject { |x| x.key?(:pull_request) }
-puts "- fetched #{issues.size} GitHub issues"
+def process_repo(github, repo)
+  repo_name = repo["name"]
+  repo_full_name = repo["full_name"]
+  data_dir = "data/#{repo_name}"
 
-unless File.directory?("#{data_dir}/issues")
-  FileUtils.mkdir_p("#{data_dir}/issues")
-end
+  puts
+  puts "Processing #{repo_name} ..."
 
-puts "- saving issues to #{data_dir}/issues"
-issues.each do |issue|
-  data = JSON.pretty_generate(issue.to_h)
-  file = format("#{data_dir}/issues/%d.json", issue[:number])
-  File.write(file, data)
-end
+  issues = github.issues(repo_full_name, state: :all).reject { |x| x.key?(:pull_request) }
+  puts "- fetched #{issues.size} GitHub issues"
 
-# Reread from the cache, to be sure we operate on the same data, we
-# don't need to bother about :number vs "number", etc. Yeah, there are
-# other ways, but it is a quick hack, nothing re-usable.
-issues = Dir.glob("#{data_dir}/issues/*.json").map do |file|
-  JSON.parse(File.read(file))
-end
-
-puts "- (re)read #{issues.size} GitHub issues from the cache"
-
-puts "- fetching comments"
-
-unless File.directory?("#{data_dir}/comments")
-  FileUtils.mkdir_p("#{data_dir}/comments")
-end
-
-issues.each.with_index do |issue, idx|
-  number = issue["number"]
-  puts "(#{idx + 1} / #{issues.size}) Fetching GitHub issue #{number} comments..."
-
-  comments = loop do
-    break Sin::Github.instance.comments(number)
-    rescue Octokit::TooManyRequests
-      resets_in = Sin::Github.instance.rate_limit.resets_in + 5
-      resets_at = Sin::Github.instance.rate_limit.resets_at
-      puts "- throttled, sleeping for #{resets_in} seconds (#{resets_at})"
-      sleep(resets_in)
+  unless File.directory?("#{data_dir}/issues")
+    FileUtils.mkdir_p("#{data_dir}/issues")
   end
 
-  comments = comments.map(&:to_h)
-  File.write(format("#{data_dir}/comments/%d.json", number), JSON.pretty_generate(comments))
+  puts "- saving issues to #{data_dir}/issues"
+  issues.each do |issue|
+    data = JSON.pretty_generate(issue.to_h)
+    file = format("#{data_dir}/issues/%d.json", issue[:number])
+    File.write(file, data)
+  end
+
+  # Reread from the cache, to be sure we operate on the same data, we
+  # don't need to bother about :number vs "number", etc. Yeah, there are
+  # other ways, but it is a quick hack, nothing re-usable.
+  issues = Dir.glob("#{data_dir}/issues/*.json").map do |file|
+    JSON.parse(File.read(file))
+  end
+
+  puts "- (re)read #{issues.size} GitHub issues from the cache"
+
+  puts "- fetching comments"
+
+  unless File.directory?("#{data_dir}/comments")
+    FileUtils.mkdir_p("#{data_dir}/comments")
+  end
+
+  issues.each.with_index do |issue, idx|
+    number = issue["number"]
+    puts " - (#{idx + 1} / #{issues.size}) Fetching GitHub issue ##{number} comments..."
+
+    comments = loop do
+      break github.comments(repo_full_name, number)
+      rescue Octokit::TooManyRequests
+        resets_in = github.rate_limit.resets_in + 5
+        resets_at = github.rate_limit.resets_at
+        puts "- throttled, sleeping for #{resets_in} seconds (#{resets_at})"
+        sleep(resets_in)
+    end
+
+    comments = comments.map(&:to_h)
+    File.write(format("#{data_dir}/comments/%d.json", number), JSON.pretty_generate(comments))
+  end
+end
+
+puts "Fetching GitHub Organization repos ..."
+
+github = Sin::Github.instance
+repos = github.organization_repositories
+
+puts "Found #{repos.size} repositories"
+
+repos.each do |repo|
+  process_repo(github, repo)
 end
