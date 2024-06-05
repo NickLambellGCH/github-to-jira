@@ -32,4 +32,4 @@ for_import = {
 
 File.write("#{data_dir}/jira-import-me.json", JSON.pretty_generate(for_import))
 puts "- done, written to #{data_dir}/jira-import-me.json"
-puts "- import at https://#{ENV.fetch("JIRA_HOST")}/secure/admin/ExternalImport1.jspa"
+puts "- import at https://#{ENV.fetch("JIRA_HOST")}/secure/admin/JsonSetupPage!default.jspa?externalSystem=com.atlassian.jira.plugins.jim-plugin%3AjsonImporter"
