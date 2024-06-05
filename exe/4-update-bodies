@@ -133,7 +133,6 @@ def process_issue(issues_size, issue, idx, repo_name, issue_map)
                          }
                        else
                          j_issue = Sin::Jira.instance.issue(key)
-                         j_comments = j_issue.comments
 
                          processed_gh_comment_ids = Set.new
 
