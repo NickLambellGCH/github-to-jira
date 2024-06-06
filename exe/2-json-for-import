@@ -24,7 +24,7 @@ def write_json(path, issues)
   File.write(path, JSON.pretty_generate(for_import))
 end
 
-def process_repo(repo_name)
+def process_repo(repo_name, status_map)
   data_dir = "data/#{repo_name}"
   out_path = "#{data_dir}/jira-import-me.json"
 
@@ -34,7 +34,7 @@ def process_repo(repo_name)
   issues = Dir.glob("#{data_dir}/issues/*.json").map do |file|
     issue = JSON.parse(File.read(file))
     comments = JSON.parse(File.read(format("#{data_dir}/comments/%d.json", issue["number"])))
-    Sin::Generator.new(ENV.fetch("JIRA_PROJECT_KEY"), issue, comments).to_jira(repo_name)
+    Sin::Generator.new(ENV.fetch("JIRA_PROJECT_KEY"), issue, comments, status_map).to_jira(repo_name)
   end
 
   puts "- Found #{issues.count} issues"
@@ -53,9 +53,13 @@ repo_names = repo_dirs.map { |dir| dir.split("/").last }
 
 puts "Found #{repo_names.count} repo directories"
 
+puts "Reading issue status map ..."
+status_map = JSON.parse(File.read("data/issue-statuses.json"))
+puts "- Read #{status_map.size} issue status mappings"
+
 all_issues = []
 repo_names.each do |repo_name|
-  repo_issues = process_repo(repo_name)
+  repo_issues = process_repo(repo_name, status_map)
   all_issues += repo_issues
 end
 

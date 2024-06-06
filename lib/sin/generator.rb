@@ -9,11 +9,13 @@ class Sin::Generator
   attr_reader :project_key
   attr_reader :issue
   attr_reader :comments
+  attr_reader :status_map
 
-  def initialize(project_key, issue, comments)
+  def initialize(project_key, issue, comments, status_map)
     @project_key = project_key
     @issue = issue
     @comments = comments
+    @status_map = status_map
   end
 
   def automation_for_jira_user_id
@@ -28,8 +30,11 @@ class Sin::Generator
     Sin::User.atlassian_id(self.issue.dig("user", "login")) || self.automation_for_jira_user_id
   end
 
-  def status
-    (self.issue["state"] == "open") ? "Imported" : "Complete"
+  def status(external_id)
+    mapped_status = self.status_map[external_id]
+    return mapped_status if mapped_status
+
+    self.issue["state"] == "open" ? "Imported" : "Complete"
   end
 
   def resolution
@@ -56,15 +61,17 @@ class Sin::Generator
       }
     end
 
+    external_id = "#{repo_name}-#{self.issue["number"]}"
+
     {
-      externalId: "#{repo_name}-#{self.issue["number"]}",
+      externalId: external_id,
       created: Time.parse(self.issue["created_at"]).utc.iso8601,
       updated: Time.parse(self.issue["updated_at"]).utc.iso8601,
       summary: self.issue["title"],
       reporter: self.reporter,
       assignee: self.assignee,
       issueType: "Task",
-      status: self.status,
+      status: self.status(external_id),
       resolution: self.resolution,
       labels: self.labels,
       components: [
