@@ -11,11 +11,12 @@
 
 require "sin"
 
-def write_json(path, issues)
+def write_json(path, repo_names, issues)
   for_import = {
     projects: [
       {
         key: ENV.fetch("JIRA_PROJECT_KEY"),
+        components: repo_names,
         issues: issues
       }
     ]
@@ -39,7 +40,7 @@ def process_repo(repo_name, status_map)
 
   puts "- Found #{issues.count} issues"
 
-  write_json(out_path, issues)
+  write_json(out_path, [ repo_name ], issues)
 
   puts "- Wrote repo specific file to #{out_path}"
 
@@ -67,7 +68,7 @@ puts
 puts "Found #{all_issues.count} issues in all repositories"
 
 out_path = "data/jira-import-me.json"
-write_json(out_path, all_issues)
+write_json(out_path, repo_names, all_issues)
 
 puts "Wrote all issues file to #{out_path}"
 puts "Import at https://#{ENV.fetch("JIRA_HOST")}/secure/admin/JsonSetupPage!default.jspa?externalSystem=com.atlassian.jira.plugins.jim-plugin%3AjsonImporter"
